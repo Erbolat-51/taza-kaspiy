@@ -12,5 +12,5 @@
     "rootDir": ".",
     "sourceMap": true
   },
-  "include": ["src", "prisma/seed"]
+  "include": ["src", "prisma/seed", "scripts"]
 }

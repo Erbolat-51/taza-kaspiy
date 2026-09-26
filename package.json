@@ -17,7 +17,9 @@
     "dev:server": "npm run dev -w server",
     "typecheck": "npm run typecheck -w server",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "ai:test": "npm run ai:test -w server --",
+    "test": "npm test -w server"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

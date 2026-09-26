@@ -6,7 +6,9 @@ import fastifyStatic from '@fastify/static';
 import { mkdir } from 'node:fs/promises';
 import { ZodError } from 'zod';
 import type { Env } from './env.js';
+import { prisma } from './db.js';
 import { AppError } from './lib/errors.js';
+import { logger } from './lib/logger.js';
 import { MAX_FILE_BYTES } from './lib/multipart.js';
 import authPlugin from './plugins/auth.js';
 import { configureUploads } from './services/photos.js';
@@ -21,16 +23,7 @@ export const corsOrigins = (env: Env) => [env.PUBLIC_URL, 'http://localhost:5173
 export async function buildApp(env: Env) {
   const app = Fastify({
     trustProxy: env.NODE_ENV === 'production', // за Caddy — реальный IP для rate limit
-    logger: {
-      level: env.NODE_ENV === 'test' ? 'warn' : 'info',
-      redact: ['req.headers.authorization'],
-      ...(env.NODE_ENV === 'development' && {
-        transport: {
-          target: 'pino-pretty',
-          options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' },
-        },
-      }),
-    },
+    loggerInstance: logger,
   });
 
   await app.register(cors, { origin: corsOrigins(env) });
@@ -66,7 +59,15 @@ export async function buildApp(env: Env) {
     });
   });
 
-  app.get('/api/health', async () => ({ ok: true, time: new Date().toISOString() }));
+  app.get('/api/health', async (_req, reply) => {
+    const started = performance.now();
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { ok: true, db: 'up', dbMs: Math.round(performance.now() - started) };
+    } catch {
+      return reply.code(503).send({ ok: false, db: 'down' });
+    }
+  });
 
   await app.register(authRoutes);
   await app.register(reportRoutes);

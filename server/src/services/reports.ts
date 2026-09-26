@@ -49,11 +49,7 @@ export async function createReport(input: CreateReportInput): Promise<CreateRepo
   const processed = await processPhoto(input.image);
   const ai =
     input.classification ??
-    (await classifyPhoto({
-      image: processed.full,
-      mimeType: 'image/webp',
-      comment: input.comment,
-    }));
+    (await classifyPhoto({ image: processed.full, comment: input.comment }));
   if (!ai.isPollution) {
     throw new AppError(422, 'NOT_POLLUTION', 'На фото не обнаружено загрязнения');
   }
