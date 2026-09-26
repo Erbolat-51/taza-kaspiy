@@ -48,3 +48,22 @@ curl -H "$H" -F photo=@after.jpg $A/api/reports/1/after-photo   # → RESOLVED
 
 `NEW → CONFIRMED → ASSIGNED → IN_PROGRESS → RESOLVED`, либо `REJECTED` (нужна причина).
 Закрытие корневого репорта закрывает его дубликаты.
+
+## Исполнители и субботники
+
+```bash
+# Субботники: публичный список ближайших; админка — все с участниками
+curl $A/api/cleanups
+curl -H "$H" $A/api/admin/cleanups
+# Создать → бот разошлёт приглашение всем подписчикам с кнопкой «Қатысамын»
+curl -H "$H" -H 'content-type: application/json' \
+  -d '{"zoneId":4,"title":"Уборка городского пляжа","startsAt":"2026-10-04T05:00:00Z","meetingPoint":"у Маяка","maxVolunteers":30}' \
+  $A/api/admin/cleanups
+curl -H "$H" -H 'content-type: application/json' -X PATCH -d '{"status":"DONE"}' $A/api/admin/cleanups/1
+```
+
+Исполнитель в Telegram: `/link КОД` (код — в админке «Орындаушылар») → при назначении приходит
+фото + точка + «🚀 Жұмысты бастадым» → «✅ Орындалды» → фото «после» → RESOLVED.
+Полный цикл без телефона: `npm run bot:sim`.
+
+Socket.IO: также `cleanup:updated { cleanupId }`, `executor:updated { executorId }`.

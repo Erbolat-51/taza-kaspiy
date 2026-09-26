@@ -3,10 +3,11 @@ import type { InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup } 
 import { CATEGORIES } from '../domain/constants.js';
 import { CATEGORY_LABEL, dict } from './i18n.js';
 
-export const mainMenu = (lang: Lang): ReplyKeyboardMarkup => {
+export const mainMenu = (lang: Lang, executor = false): ReplyKeyboardMarkup => {
   const t = dict[lang];
   return {
     keyboard: [
+      ...(executor ? [[{ text: t.menuTasks }]] : []),
       [{ text: t.menuReport }],
       [{ text: t.menuMap }, { text: t.menuCleanups }],
       [{ text: t.menuMy }, { text: t.menuLang }],
@@ -73,3 +74,7 @@ export const categoryKeyboard = (lang: Lang, reportId: number): InlineKeyboardMa
   for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2));
   return { inline_keyboard: rows };
 };
+
+/** Меню с учётом роли: исполнитель видит «Менің тапсырмаларым» первой кнопкой. */
+export const menuFor = (ctx: { user: { lang: Lang; executorId: number | null } }) =>
+  mainMenu(ctx.user.lang, ctx.user.executorId !== null);

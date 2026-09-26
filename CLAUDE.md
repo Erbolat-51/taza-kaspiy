@@ -190,3 +190,8 @@ ADMIN_PASSWORD=admin123
   В `aiRaw`: provider, model, top3. Windows: нужен VC++ Redistributable ≥ 14.40 (иначе CLIP → mock).
 - **Фаза 8 / Docker:** модель CLIP (~150 МБ) кэшировать в volume `./models` или запекать в образ; onnxruntime-node
   на Linux работает без install-скрипта (CPU-бинарники в пакете).
+- **Порядок фаз изменён:** 6 → 8 (деплой) → 7.
+- **Фаза 8 / безопасность входа:** подсказку «Демо: admin@taza.kz / admin123» на странице входа показывать только
+  при NODE_ENV != production (во фронте — `import.meta.env.DEV` или флаг от сервера). `ADMIN_PASSWORD` в проде —
+  сгенерированный; seed должен **отказаться стартовать** с `admin123` (и паролем короче 12 символов) при
+  NODE_ENV=production.

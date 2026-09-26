@@ -5,7 +5,7 @@ import type { Env } from '../env.js';
 import { logger } from '../lib/logger.js';
 import { initialSession, type BotContext } from './context.js';
 import { dict } from './i18n.js';
-import { langKeyboard, mainMenu } from './keyboards.js';
+import { langKeyboard, mainMenu, menuFor } from './keyboards.js';
 import {
   onCategory,
   onChangeRequest,
@@ -19,12 +19,21 @@ import {
 } from './flow.js';
 import { joinCleanup, showCleanups, showMap, showMyReports } from './menu.js';
 import { registerNotifications } from './notify.js';
+import {
+  linkExecutor,
+  onAfterPhoto,
+  onTaskDone,
+  onTaskStart,
+  registerTaskNotifications,
+  showTasks,
+} from './executor.js';
+import { registerCleanupBroadcast } from './cleanups.js';
 import { loadBotUser, setLang } from './users.js';
 
 export const WEBHOOK_PATH = '/api/telegram/webhook';
 
 /** Надпись кнопки меню (на любом языке) → действие. */
-type MenuAction = 'report' | 'map' | 'cleanups' | 'my' | 'lang' | 'cancel';
+type MenuAction = 'report' | 'map' | 'cleanups' | 'my' | 'lang' | 'cancel' | 'tasks';
 const MENU = new Map<string, MenuAction>();
 for (const t of [dict.kk, dict.ru]) {
   MENU.set(t.menuReport, 'report');
@@ -33,6 +42,7 @@ for (const t of [dict.kk, dict.ru]) {
   MENU.set(t.menuMy, 'my');
   MENU.set(t.menuLang, 'lang');
   MENU.set(t.btnCancel, 'cancel');
+  MENU.set(t.menuTasks, 'tasks');
 }
 
 export function createBot(env: Env, config?: BotConfig<BotContext>) {
@@ -69,9 +79,11 @@ export function createBot(env: Env, config?: BotConfig<BotContext>) {
   pm.command('report', (ctx) => startReport(ctx));
   pm.command('my', (ctx) => showMyReports(ctx, deps));
   pm.command('map', (ctx) => showMap(ctx, deps));
+  pm.command('link', (ctx) => linkExecutor(ctx, ctx.match));
+  pm.command('tasks', (ctx) => showTasks(ctx));
   pm.command('cancel', async (ctx) => {
     resetFlow(ctx);
-    await ctx.reply(dict[ctx.user.lang].cancelled, { reply_markup: mainMenu(ctx.user.lang) });
+    await ctx.reply(dict[ctx.user.lang].cancelled, { reply_markup: menuFor(ctx) });
   });
 
   pm.callbackQuery(/^lang:(kk|ru)$/, async (ctx) => {
@@ -82,7 +94,7 @@ export function createBot(env: Env, config?: BotConfig<BotContext>) {
     const name = ctx.from.first_name || '👋';
     await ctx.reply(dict[lang].welcome(name.replace(/[<>&]/g, '')), {
       parse_mode: 'HTML',
-      reply_markup: mainMenu(lang),
+      reply_markup: menuFor(ctx),
     });
   });
   pm.callbackQuery(/^ok:(\d+)$/, (ctx) => onConfirm(ctx, Number(ctx.match[1]), deps));
@@ -91,10 +103,14 @@ export function createBot(env: Env, config?: BotConfig<BotContext>) {
     onCategory(ctx, Number(ctx.match[1]), ctx.match[2]!, deps),
   );
   pm.callbackQuery(/^join:(\d+)$/, (ctx) => joinCleanup(ctx, Number(ctx.match[1])));
+  pm.callbackQuery(/^start:(\d+)$/, (ctx) => onTaskStart(ctx, Number(ctx.match[1])));
+  pm.callbackQuery(/^done:(\d+)$/, (ctx) => onTaskDone(ctx, Number(ctx.match[1])));
   pm.on('callback_query:data', (ctx) => ctx.answerCallbackQuery());
 
   pm.on('message:photo', (ctx) => {
     const best = ctx.message.photo.at(-1)!;
+    // Исполнитель после «Орындалды» присылает фото «после», а не новый репорт
+    if (ctx.session.step === 'afterPhoto') return onAfterPhoto(ctx, best.file_id, deps);
     return onPhoto(ctx, best.file_id, best.file_size, deps);
   });
   pm.on('message:document', async (ctx) => {
@@ -103,6 +119,7 @@ export function createBot(env: Env, config?: BotConfig<BotContext>) {
       await ctx.reply(dict[ctx.user.lang].notImage);
       return;
     }
+    if (ctx.session.step === 'afterPhoto') return onAfterPhoto(ctx, doc.file_id, deps);
     await onPhoto(ctx, doc.file_id, doc.file_size, deps);
   });
   pm.on('message:location', (ctx) =>
@@ -117,7 +134,7 @@ export function createBot(env: Env, config?: BotConfig<BotContext>) {
 
     if (action === 'cancel') {
       resetFlow(ctx);
-      return ctx.reply(t.cancelled, { reply_markup: mainMenu(lang) });
+      return ctx.reply(t.cancelled, { reply_markup: menuFor(ctx) });
     }
     if (ctx.session.step === 'comment' && !action) return onComment(ctx, text, deps);
     if (ctx.session.step === 'processing') return;
@@ -133,15 +150,17 @@ export function createBot(env: Env, config?: BotConfig<BotContext>) {
         return showMyReports(ctx, deps);
       case 'lang':
         return ctx.reply(t.chooseLang, { reply_markup: langKeyboard });
+      case 'tasks':
+        return showTasks(ctx);
     }
+    if (ctx.session.step === 'afterPhoto')
+      return ctx.reply(t.askAfterPhoto(''), { parse_mode: 'HTML' });
     if (ctx.session.step === 'photo') return ctx.reply(t.askPhoto);
     if (ctx.session.step === 'location') return ctx.reply(t.needLocation);
-    return ctx.reply(t.unknown, { reply_markup: mainMenu(lang) });
+    return ctx.reply(t.unknown, { reply_markup: menuFor(ctx) });
   });
 
-  pm.on('message', (ctx) =>
-    ctx.reply(dict[ctx.user.lang].unknown, { reply_markup: mainMenu(ctx.user.lang) }),
-  );
+  pm.on('message', (ctx) => ctx.reply(dict[ctx.user.lang].unknown, { reply_markup: menuFor(ctx) }));
 
   return bot;
 }
@@ -152,6 +171,7 @@ async function setCommands(bot: Bot<BotContext>) {
     { command: 'report', description: 'Ластануды хабарлау' },
     { command: 'my', description: 'Менің хабарламаларым' },
     { command: 'map', description: 'Карта' },
+    { command: 'tasks', description: 'Менің тапсырмаларым (орындаушы)' },
     { command: 'lang', description: 'Тіл / Язык' },
     { command: 'cancel', description: 'Болдырмау' },
   ]);
@@ -161,6 +181,7 @@ async function setCommands(bot: Bot<BotContext>) {
       { command: 'report', description: 'Сообщить о загрязнении' },
       { command: 'my', description: 'Мои сообщения' },
       { command: 'map', description: 'Карта' },
+      { command: 'tasks', description: 'Мои задачи (исполнитель)' },
       { command: 'lang', description: 'Тіл / Язык' },
       { command: 'cancel', description: 'Отмена' },
     ],
@@ -180,7 +201,11 @@ export async function startBot(env: Env, app: App) {
   const bot = createBot(env);
   await bot.init();
   await setCommands(bot).catch((err) => logger.warn({ err }, 'bot: setMyCommands failed'));
-  const unsubscribe = registerNotifications(bot.api);
+  const unsubscribers = [
+    registerNotifications(bot.api),
+    registerTaskNotifications(bot.api),
+    registerCleanupBroadcast(bot.api),
+  ];
 
   if (env.TELEGRAM_MODE === 'webhook') {
     // Секрет для заголовка X-Telegram-Bot-Api-Secret-Token выводим из токена — без лишней переменной
@@ -208,7 +233,7 @@ export async function startBot(env: Env, app: App) {
   return {
     bot,
     stop: async () => {
-      unsubscribe();
+      unsubscribers.forEach((u) => u());
       if (env.TELEGRAM_MODE !== 'webhook') await bot.stop();
     },
   };

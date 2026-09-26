@@ -27,6 +27,7 @@ const nav = [
   { to: '/admin', key: 'admin.nav.dashboard', icon: '📊', exact: true },
   { to: '/admin/reports', key: 'admin.nav.reports', icon: '🗂' },
   { to: '/admin/executors', key: 'admin.nav.executors', icon: '👷' },
+  { to: '/admin/cleanups', key: 'admin.nav.cleanups', icon: '🧹' },
 ];
 </script>
 

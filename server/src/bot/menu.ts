@@ -1,7 +1,8 @@
 import { prisma } from '../db.js';
+import { bus } from '../lib/bus.js';
 import type { BotContext } from './context.js';
 import { CATEGORY_LABEL, STATUS_LABEL, dict, esc } from './i18n.js';
-import { mainMenu } from './keyboards.js';
+import { menuFor } from './keyboards.js';
 import { reportLink, zoneName, type FlowDeps } from './flow.js';
 
 const HTML = { parse_mode: 'HTML' as const };
@@ -26,7 +27,7 @@ export async function showMap(ctx: BotContext, deps: FlowDeps) {
       reply_markup: { inline_keyboard: [[{ text: t.btnOpenMap, url: deps.publicUrl }]] },
     });
   } else {
-    await ctx.reply(t.mapText(deps.publicUrl), { reply_markup: mainMenu(ctx.user.lang) });
+    await ctx.reply(t.mapText(deps.publicUrl), { reply_markup: menuFor(ctx) });
   }
 }
 
@@ -40,7 +41,7 @@ export async function showMyReports(ctx: BotContext, deps: FlowDeps) {
     include: { zone: { select: { nameKk: true, nameRu: true } } },
   });
   if (reports.length === 0) {
-    await ctx.reply(t.myEmpty, { reply_markup: mainMenu(lang) });
+    await ctx.reply(t.myEmpty, { reply_markup: menuFor(ctx) });
     return;
   }
   const lines = reports.map((r) => {
@@ -56,7 +57,7 @@ export async function showMyReports(ctx: BotContext, deps: FlowDeps) {
   await ctx.reply(`${t.myTitle}\n\n${lines.join('\n\n')}`, {
     ...HTML,
     link_preview_options: { is_disabled: true },
-    reply_markup: mainMenu(lang),
+    reply_markup: menuFor(ctx),
   });
 }
 
@@ -70,10 +71,10 @@ export async function showCleanups(ctx: BotContext) {
     include: { zone: true, _count: { select: { signups: true } } },
   });
   if (cleanups.length === 0) {
-    await ctx.reply(t.cleanupsEmpty, { reply_markup: mainMenu(lang) });
+    await ctx.reply(t.cleanupsEmpty, { reply_markup: menuFor(ctx) });
     return;
   }
-  await ctx.reply(t.cleanupsTitle, { ...HTML, reply_markup: mainMenu(lang) });
+  await ctx.reply(t.cleanupsTitle, { ...HTML, reply_markup: menuFor(ctx) });
   for (const c of cleanups) {
     await ctx.reply(
       t.cleanupLine(
@@ -105,5 +106,6 @@ export async function joinCleanup(ctx: BotContext, cleanupId: number) {
   if (exists) return ctx.answerCallbackQuery({ text: t.alreadyJoined });
   if (c._count.signups >= c.maxVolunteers) return ctx.answerCallbackQuery({ text: t.cleanupFull });
   await prisma.cleanupSignup.create({ data: { cleanupId, tgUserId: ctx.user.id } });
+  bus.emit('cleanup:updated', { cleanupId });
   await ctx.answerCallbackQuery({ text: t.joined });
 }

@@ -31,6 +31,11 @@ export const router = createRouter({
           name: 'executors',
           component: () => import('./admin/pages/AdminExecutors.vue'),
         },
+        {
+          path: 'cleanups',
+          name: 'cleanups',
+          component: () => import('./admin/pages/AdminCleanups.vue'),
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },

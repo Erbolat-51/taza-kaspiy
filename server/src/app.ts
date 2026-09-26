@@ -20,6 +20,7 @@ import zoneRoutes from './routes/zones.js';
 import executorRoutes from './routes/executors.js';
 import statsRoutes from './routes/stats.js';
 import adminRoutes from './routes/admin.js';
+import cleanupRoutes from './routes/cleanups.js';
 
 export const corsOrigins = (env: Env) => [env.PUBLIC_URL, 'http://localhost:5173'];
 
@@ -83,6 +84,7 @@ export async function buildApp(env: Env) {
   await app.register(executorRoutes);
   await app.register(statsRoutes);
   await app.register(adminRoutes);
+  await app.register(cleanupRoutes);
 
   // Собранный фронт (web/dist): в проде — всегда, в dev — если сделан `npm run build -w web`
   const webDist = resolve(process.env.WEB_DIST ?? '../web/dist');

@@ -19,8 +19,14 @@ export async function loadBotUser(from: User, chatId: number): Promise<BotUser> 
       lang: from.language_code === 'ru' ? 'ru' : 'kk',
     },
     update: { chatId: BigInt(chatId), username: from.username ?? null, firstName: from.first_name },
+    include: { executor: { select: { id: true } } },
   });
-  const user: BotUser = { id: row.id, lang: row.lang, firstName: row.firstName };
+  const user: BotUser = {
+    id: row.id,
+    lang: row.lang,
+    firstName: row.firstName,
+    executorId: row.executor?.id ?? null,
+  };
   cache.set(from.id, user);
   return user;
 }
@@ -28,5 +34,10 @@ export async function loadBotUser(from: User, chatId: number): Promise<BotUser> 
 export async function setLang(telegramId: number, user: BotUser, lang: Lang) {
   await prisma.tgUser.update({ where: { id: user.id }, data: { lang } });
   user.lang = lang;
+  cache.set(telegramId, user);
+}
+
+export function setExecutor(telegramId: number, user: BotUser, executorId: number) {
+  user.executorId = executorId;
   cache.set(telegramId, user);
 }

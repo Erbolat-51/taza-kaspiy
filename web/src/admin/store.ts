@@ -86,6 +86,8 @@ export const useAdmin = defineStore('admin', () => {
       if (report.executorId) void reloadExecutors().catch(() => {});
     });
     socket.on('zone:updated', () => version.value++);
+    // Исполнитель привязал Telegram (/link) — обновить статус «📱» в списке
+    socket.on('executor:updated', () => void reloadExecutors().catch(() => {}));
     socket.on('connect', () => {
       // Переподключились — могли пропустить события
       if (reports.value.length) void load();

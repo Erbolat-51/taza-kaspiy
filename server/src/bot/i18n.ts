@@ -60,6 +60,52 @@ const kk = {
   resolvedThanks: (code: string) => `✅ <b>${code}</b>\nРақмет! Жағалау тазарды 🌊`,
   before: 'Дейін',
   after: 'Кейін',
+  // ── исполнитель ──
+  menuTasks: '🧰 Менің тапсырмаларым',
+  linkUsage: 'Қолданылуы: /link КОД\nКодты әкімдіктің панелінен алыңыз.',
+  linkBad: 'Код табылмады 🤔 Әкімдіктен кодты тексеріңіз.',
+  linkOk: (name: string) =>
+    `✅ Сіз <b>«${name}»</b> орындаушысы ретінде тіркелдіңіз.
+Жаңа тапсырмалар осында келеді 🔔`,
+  taskNew: (
+    code: string,
+    cat: string,
+    sev: number,
+    zone: string,
+    summary: string,
+    comment: string | null,
+  ) =>
+    `🆕 <b>Жаңа тапсырма: ${code}</b>
+${cat} · Қауіптілік ${sev}/5
+📍 ${zone}
+<i>${summary}</i>${
+      comment
+        ? `
+💬 «${comment}»`
+        : ''
+    }`,
+  taskGo: '👇 Орны. Орынға жеткенде «Жұмысты бастадым» басыңыз.',
+  btnStart: '🚀 Жұмысты бастадым',
+  btnDone: '✅ Орындалды',
+  taskStarted: (code: string) =>
+    `🚧 <b>${code}</b>: жұмыс басталды. Аяқтағанда «Орындалды» басыңыз.`,
+  askAfterPhoto: (code: string) =>
+    `📸 <b>${code}</b>: тазаланған жердің «кейін» фотосын жіберіңіз.`,
+  taskClosed: (code: string) =>
+    `✅ <b>${code}</b> жабылды. Рақмет! Тұрғын «дейін/кейін» фотосын алады 🌊`,
+  taskNotYours: 'Бұл тапсырма сізге тағайындалмаған немесе жабылған.',
+  taskReassigned: (code: string) => `ℹ️ ${code} тапсырмасы басқа орындаушыға берілді.`,
+  tasksEmpty: 'Белсенді тапсырма жоқ 👍',
+  tasksTitle: '🧰 <b>Белсенді тапсырмалар:</b>',
+  // ── субботники ──
+  cleanupNew: (title: string, when: string, where: string, zone: string) =>
+    `🧹 <b>Жаңа сенбілік!</b>
+
+<b>${title}</b>
+🗓 ${when}
+📍 ${zone} — ${where}
+
+Жағалауды бірге тазалайық 💪`,
 };
 
 type Dict = typeof kk;
@@ -124,6 +170,40 @@ const ru: Dict = {
   resolvedThanks: (code) => `✅ <b>${code}</b>\nСпасибо! Берег стал чище 🌊`,
   before: 'До',
   after: 'После',
+  menuTasks: '🧰 Мои задачи',
+  linkUsage: 'Использование: /link КОД\nКод выдаётся в панели акимата.',
+  linkBad: 'Код не найден 🤔 Проверьте код у акимата.',
+  linkOk: (name) =>
+    `✅ Вы зарегистрированы как исполнитель <b>«${name}»</b>.
+Новые задачи будут приходить сюда 🔔`,
+  taskNew: (code, cat, sev, zone, summary, comment) =>
+    `🆕 <b>Новая задача: ${code}</b>
+${cat} · Опасность ${sev}/5
+📍 ${zone}
+<i>${summary}</i>${
+      comment
+        ? `
+💬 «${comment}»`
+        : ''
+    }`,
+  taskGo: '👇 Место. Когда будете на месте, нажмите «Начал работу».',
+  btnStart: '🚀 Начал работу',
+  btnDone: '✅ Выполнено',
+  taskStarted: (code) => `🚧 <b>${code}</b>: работа начата. По завершении нажмите «Выполнено».`,
+  askAfterPhoto: (code) => `📸 <b>${code}</b>: отправьте фото «после» убранного места.`,
+  taskClosed: (code) => `✅ <b>${code}</b> закрыта. Спасибо! Житель получит фото «до/после» 🌊`,
+  taskNotYours: 'Эта задача не назначена вам или уже закрыта.',
+  taskReassigned: (code) => `ℹ️ Задача ${code} передана другому исполнителю.`,
+  tasksEmpty: 'Активных задач нет 👍',
+  tasksTitle: '🧰 <b>Активные задачи:</b>',
+  cleanupNew: (title, when, where, zone) =>
+    `🧹 <b>Новый субботник!</b>
+
+<b>${title}</b>
+🗓 ${when}
+📍 ${zone} — ${where}
+
+Давайте уберём берег вместе 💪`,
 };
 
 export const dict: Record<Lang, Dict> = { kk, ru };

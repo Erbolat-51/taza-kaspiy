@@ -8,7 +8,7 @@ import type { ReportWithRefs } from '../services/reportShape.js';
  */
 export type ReportChange =
   | { type: 'status'; from: ReportStatus; to: ReportStatus }
-  | { type: 'assigned'; executorId: number }
+  | { type: 'assigned'; executorId: number; previousExecutorId: number | null }
   | { type: 'afterPhoto' }
   | { type: 'duplicate'; childId: number }
   | { type: 'category'; from: Category; to: Category };
@@ -17,6 +17,9 @@ export interface BusEvents {
   'report:created': { report: ReportWithRefs; duplicateOf: number | null };
   'report:updated': { report: ReportWithRefs; change: ReportChange; actor: string };
   'zone:index': { zoneId: number; cleanIndex: number };
+  'executor:linked': { executorId: number };
+  'cleanup:created': { cleanupId: number };
+  'cleanup:updated': { cleanupId: number };
 }
 
 class TypedBus {

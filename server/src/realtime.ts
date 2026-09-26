@@ -17,6 +17,9 @@ export function attachRealtime(server: HttpServer, corsOrigins: string[]) {
   bus.on('report:updated', ({ report, change }) => {
     io.emit('report:updated', { report: toPublic(report), change });
   });
+  bus.on('cleanup:created', ({ cleanupId }) => io.emit('cleanup:updated', { cleanupId }));
+  bus.on('cleanup:updated', ({ cleanupId }) => io.emit('cleanup:updated', { cleanupId }));
+  bus.on('executor:linked', ({ executorId }) => io.emit('executor:updated', { executorId }));
   bus.on('zone:index', ({ zoneId, cleanIndex }) => {
     io.emit('zone:updated', { zoneId, cleanIndex, color: indexColor(cleanIndex) });
   });

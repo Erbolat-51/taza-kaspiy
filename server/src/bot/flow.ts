@@ -14,7 +14,7 @@ import {
   commentKeyboard,
   confirmKeyboard,
   locationKeyboard,
-  mainMenu,
+  menuFor,
 } from './keyboards.js';
 
 const HTML = { parse_mode: 'HTML' as const };
@@ -172,7 +172,7 @@ async function processDraft(ctx: BotContext, deps: FlowDeps) {
     await dropWait();
     resetFlow(ctx);
     if (err instanceof AppError && err.code === 'BAD_IMAGE') {
-      await ctx.reply(t.notImage, { reply_markup: mainMenu(lang) });
+      await ctx.reply(t.notImage, { reply_markup: menuFor(ctx) });
       return;
     }
     throw err;
@@ -190,7 +190,7 @@ async function sendRegistered(ctx: BotContext, reportId: number, deps: FlowDeps)
   if (!r) return;
   let text = t.registered(r.code, reportLink(deps.publicUrl, reportId));
   if (r.parent) text += '\n\n' + t.duplicateNote(r.parent.code);
-  await ctx.reply(text, { ...HTML, reply_markup: mainMenu(ctx.user.lang) });
+  await ctx.reply(text, { ...HTML, reply_markup: menuFor(ctx) });
 }
 
 /** Защита от двойного нажатия: подтверждённый репорт повторно не обрабатываем. */

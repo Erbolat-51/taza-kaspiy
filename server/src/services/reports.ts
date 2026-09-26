@@ -334,7 +334,11 @@ export async function assignExecutor(
       : []),
   ]);
 
-  bus.emit('report:updated', { report, change: { type: 'assigned', executorId }, actor });
+  bus.emit('report:updated', {
+    report,
+    change: { type: 'assigned', executorId, previousExecutorId: current.executorId },
+    actor,
+  });
   if (current.status !== 'ASSIGNED') {
     bus.emit('report:updated', {
       report,
