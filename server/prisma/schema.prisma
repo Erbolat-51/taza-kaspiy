@@ -1,0 +1,216 @@
+// Таза Каспий — модель данных
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ZoneKind {
+  CITY_BEACH
+  WILD_COAST
+  PORT_INDUSTRIAL
+  RESORT
+  SETTLEMENT
+}
+
+enum Lang {
+  kk
+  ru
+}
+
+enum TgRole {
+  RESIDENT
+  EXECUTOR
+}
+
+enum ReportSource {
+  BOT
+  WEB
+}
+
+enum Category {
+  TRASH
+  PLASTIC
+  OIL
+  DEAD_ANIMAL
+  SEWAGE
+  CONSTRUCTION
+  OTHER
+}
+
+enum ReportStatus {
+  NEW
+  CONFIRMED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
+
+enum EventType {
+  CREATED
+  AI_CLASSIFIED
+  STATUS_CHANGED
+  ASSIGNED
+  AFTER_PHOTO
+  COMMENT
+}
+
+enum ExecutorKind {
+  UTILITY
+  ECOLOGY
+  VOLUNTEER_ORG
+  ANIMAL_RESCUE
+}
+
+enum CleanupStatus {
+  PLANNED
+  DONE
+  CANCELLED
+}
+
+enum AdminRole {
+  ADMIN
+  OPERATOR
+}
+
+/// Участок побережья
+model Zone {
+  id             Int      @id @default(autoincrement())
+  slug           String   @unique
+  nameKk         String
+  nameRu         String
+  kind           ZoneKind
+  polygon        Json // GeoJSON Polygon geometry
+  centerLat      Float
+  centerLng      Float
+  /// Кэш индекса чистоты 0–100, пересчитывается при изменении репортов
+  cleanIndex     Float    @default(100)
+  indexUpdatedAt DateTime @default(now())
+
+  reports  Report[]
+  cleanups Cleanup[]
+}
+
+model TgUser {
+  id         Int      @id @default(autoincrement())
+  telegramId BigInt   @unique
+  chatId     BigInt
+  username   String?
+  firstName  String?
+  lang       Lang     @default(kk)
+  role       TgRole   @default(RESIDENT)
+  createdAt  DateTime @default(now())
+
+  reports  Report[]
+  executor Executor?
+  signups  CleanupSignup[]
+}
+
+model Report {
+  id                      Int          @id @default(autoincrement())
+  code                    String       @unique // ТК-0001
+  source                  ReportSource
+  tgUserId                Int?
+  lat                     Float
+  lng                     Float
+  zoneId                  Int?
+  comment                 String?
+  photo                   String
+  photoThumb              String
+  afterPhoto              String?
+  category                Category     @default(OTHER)
+  severity                Int          @default(2) // 1–5
+  aiConfidence            Float        @default(0)
+  aiSummaryKk             String?
+  aiSummaryRu             String?
+  aiRaw                   Json?
+  categoryConfirmedByUser Boolean      @default(false)
+  status                  ReportStatus @default(NEW)
+  executorId              Int?
+  parentId                Int?
+  duplicatesCount         Int          @default(0)
+  rejectReason            String?
+  createdAt               DateTime     @default(now())
+  assignedAt              DateTime?
+  resolvedAt              DateTime?
+  isDemo                  Boolean      @default(false)
+
+  tgUser     TgUser?       @relation(fields: [tgUserId], references: [id], onDelete: SetNull)
+  zone       Zone?         @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  executor   Executor?     @relation(fields: [executorId], references: [id], onDelete: SetNull)
+  parent     Report?       @relation("Duplicates", fields: [parentId], references: [id], onDelete: SetNull)
+  duplicates Report[]      @relation("Duplicates")
+  events     ReportEvent[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([zoneId, status])
+  @@index([category, status, createdAt])
+  @@index([lat, lng])
+}
+
+model ReportEvent {
+  id        Int       @id @default(autoincrement())
+  reportId  Int
+  type      EventType
+  payload   Json      @default("{}")
+  actor     String // "bot:<tgId>", "admin:<email>", "executor:<id>", "system"
+  createdAt DateTime  @default(now())
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, createdAt])
+}
+
+model Executor {
+  id       Int          @id @default(autoincrement())
+  nameKk   String
+  nameRu   String
+  kind     ExecutorKind
+  tgUserId Int?         @unique
+  /// Код привязки к Telegram: исполнитель отправляет боту /link КОД
+  linkCode String?      @unique
+
+  tgUser  TgUser?  @relation(fields: [tgUserId], references: [id], onDelete: SetNull)
+  reports Report[]
+}
+
+model Cleanup {
+  id            Int           @id @default(autoincrement())
+  zoneId        Int
+  title         String
+  startsAt      DateTime
+  meetingPoint  String
+  maxVolunteers Int           @default(50)
+  status        CleanupStatus @default(PLANNED)
+  createdAt     DateTime      @default(now())
+
+  zone    Zone            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  signups CleanupSignup[]
+
+  @@index([startsAt])
+}
+
+model CleanupSignup {
+  cleanupId Int
+  tgUserId  Int
+  createdAt DateTime @default(now())
+
+  cleanup Cleanup @relation(fields: [cleanupId], references: [id], onDelete: Cascade)
+  tgUser  TgUser  @relation(fields: [tgUserId], references: [id], onDelete: Cascade)
+
+  @@id([cleanupId, tgUserId])
+}
+
+model AdminUser {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         AdminRole @default(OPERATOR)
+  createdAt    DateTime  @default(now())
+}

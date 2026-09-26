@@ -1,0 +1,6 @@
+node_modules
+dist
+uploads
+server/prisma/migrations
+package-lock.json
+CLAUDE.md
