@@ -4,6 +4,8 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import { mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { ZodError } from 'zod';
 import type { Env } from './env.js';
 import { prisma } from './db.js';
@@ -74,6 +76,19 @@ export async function buildApp(env: Env) {
   await app.register(zoneRoutes);
   await app.register(executorRoutes);
   await app.register(statsRoutes);
+
+  // Собранный фронт (web/dist): в проде — всегда, в dev — если сделан `npm run build -w web`
+  const webDist = resolve(process.env.WEB_DIST ?? '../web/dist');
+  if (existsSync(webDist)) {
+    await app.register(fastifyStatic, { root: webDist, prefix: '/', wildcard: false });
+    // SPA: все не-API маршруты отдают index.html (vue-router разберётся)
+    app.setNotFoundHandler((req, reply) => {
+      if (req.method !== 'GET' || /^\/(api|uploads|socket\.io)\//.test(req.url)) {
+        return reply.code(404).send({ error: 'NOT_FOUND', message: 'Not found' });
+      }
+      return reply.sendFile('index.html', webDist);
+    });
+  }
 
   return app;
 }

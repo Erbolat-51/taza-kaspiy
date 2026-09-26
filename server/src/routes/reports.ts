@@ -11,7 +11,7 @@ import {
   getReportDetails,
   listReports,
 } from '../services/reports.js';
-import { toPublic } from '../services/reportShape.js';
+import { toPublic, toPublicDetails } from '../services/reportShape.js';
 
 const csv = <T extends readonly [string, ...string[]]>(values: T) =>
   z
@@ -71,7 +71,7 @@ export default async function reportRoutes(app: FastifyInstance) {
 
   app.get('/api/reports/:id', async (req) => {
     const { id } = IdParams.parse(req.params);
-    return toPublic(await getReportDetails(id));
+    return toPublicDetails(await getReportDetails(id));
   });
 
   app.post(
