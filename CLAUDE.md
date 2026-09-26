@@ -195,3 +195,6 @@ ADMIN_PASSWORD=admin123
   при NODE_ENV != production (во фронте — `import.meta.env.DEV` или флаг от сервера). `ADMIN_PASSWORD` в проде —
   сгенерированный; seed должен **отказаться стартовать** с `admin123` (и паролем короче 12 символов) при
   NODE_ENV=production.
+- **Деплой сейчас (вместо Фазы 8 на VPS):** Cloudflare quick tunnel с ноутбука (`start-demo.ps1` / `stop-demo.ps1`),
+  `--protocol http2` (QUIC у провайдера рвётся), сервер `NODE_ENV=production`, `HOST=127.0.0.1`, бот в polling.
+  PUBLIC_URL обновляется при каждом запуске. Домен headways.space НЕ использовать. Дальше — VPS/Oracle Free + Docker + Caddy + webhook.

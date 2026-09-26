@@ -3,6 +3,8 @@ import { z } from 'zod';
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().default(3000),
+  /** 127.0.0.1 — доступ только через туннель/прокси; 0.0.0.0 — из локальной сети (dev, Docker) */
+  HOST: z.string().default('0.0.0.0'),
   DATABASE_URL: z.string().min(1),
   TELEGRAM_BOT_TOKEN: z.string().default(''),
   TELEGRAM_MODE: z.enum(['polling', 'webhook']).default('polling'),

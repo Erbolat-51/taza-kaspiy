@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "dotenv -e ../.env -- tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prisma": "dotenv -e ../.env -- prisma",
     "db:generate": "prisma generate",
@@ -15,7 +15,8 @@
     "seed": "dotenv -e ../.env -- prisma migrate deploy && dotenv -e ../.env -- tsx prisma/seed/index.ts",
     "test": "vitest run",
     "ai:test": "dotenv -e ../.env -- tsx scripts/ai-test.ts",
-    "bot:sim": "dotenv -e ../.env -- tsx scripts/bot-sim.ts"
+    "bot:sim": "dotenv -e ../.env -- tsx scripts/bot-sim.ts",
+    "start": "node --env-file=../.env dist/src/index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

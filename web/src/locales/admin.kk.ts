@@ -7,7 +7,6 @@ export default {
     password: 'Құпиясөз',
     submit: 'Кіру',
     error: 'Email немесе құпиясөз қате',
-    hint: "Демо: admin{'@'}taza.kz / admin123",
   },
   nav: {
     dashboard: 'Дашборд',

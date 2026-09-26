@@ -9,6 +9,11 @@ const auth = useAuth();
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
+/**
+ * Демо-логин — только в dev. В прод-сборке DEV=false, и сборщик выкидывает строку целиком:
+ * админка открыта в интернет, а пароль там сгенерированный.
+ */
+const devHint = import.meta.env.DEV ? 'Демо: admin@taza.kz / admin123' : '';
 
 const email = ref('');
 const password = ref('');
@@ -72,7 +77,7 @@ async function submit() {
       >
         {{ t('admin.login.submit') }}
       </button>
-      <p class="mt-4 text-center text-xs text-muted">{{ t('admin.login.hint') }}</p>
+      <p v-if="devHint" class="mt-4 text-center text-xs text-muted">{{ devHint }}</p>
     </form>
   </main>
 </template>

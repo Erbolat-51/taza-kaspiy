@@ -4,3 +4,5 @@ uploads
 server/prisma/migrations
 package-lock.json
 CLAUDE.md
+start-demo.ps1
+stop-demo.ps1

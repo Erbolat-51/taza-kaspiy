@@ -9,7 +9,6 @@ const ru: typeof kk = {
     password: 'Пароль',
     submit: 'Войти',
     error: 'Неверный email или пароль',
-    hint: "Демо: admin{'@'}taza.kz / admin123",
   },
   nav: {
     dashboard: 'Дашборд',

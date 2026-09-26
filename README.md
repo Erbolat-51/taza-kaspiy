@@ -4,8 +4,70 @@
 загрязнения, точка появляется на карте, акимат назначает исполнителя, берег убирают, и точка
 на карте становится зелёной.
 
-> Полный README для жюри (проблема, скриншоты, архитектура, запуск, команда) появится в Фазе 8.
-> Сейчас здесь описана часть про ИИ.
+> Полный README для жюри (проблема, скриншоты, архитектура, команда) дописывается.
+> Сейчас здесь: запуск демо и ИИ.
+
+## Запуск демо
+
+**Честно о текущем состоянии.** Прототип работает **с ноутбука команды** через
+[Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/):
+Cloudflare выдаёт временный адрес `https://*.trycloudflare.com` и проксирует запросы на ноутбук.
+База данных — Neon (облачный PostgreSQL, Франкфурт), Telegram-бот работает в режиме polling.
+Пока ноутбук выключен, демо недоступно, а адрес меняется при каждом запуске.
+
+**План:** перенести на VPS (Oracle Cloud Free Tier или любой Ubuntu-сервер) с постоянным доменом.
+Для этого в репозитории остаётся `docker-compose.yml`; Dockerfile, Caddy (HTTPS) и webhook-режим бота
+будут добавлены при переносе.
+
+### Одна команда
+
+Нужны: Node.js 20+, [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+(`winget install Cloudflare.cloudflared`), заполненный `.env` (см. `.env.example`).
+
+```powershell
+npm install
+npm run seed                                   # миграции + зоны, исполнители, админ
+powershell -ExecutionPolicy Bypass -File .start-demo.ps1            # запуск
+powershell -ExecutionPolicy Bypass -File .start-demo.ps1 -Rebuild   # запуск с пересборкой
+powershell -ExecutionPolicy Bypass -File .stop-demo.ps1             # остановка
+```
+
+`start-demo.ps1` делает всё сам:
+
+1. останавливает предыдущий запуск;
+2. собирает web и server, если сборки нет (или с флагом `-Rebuild`);
+3. поднимает туннель и забирает выданный адрес `https://….trycloudflare.com`;
+4. записывает его в `PUBLIC_URL` в `.env`, чтобы ссылки «Картада» в боте вели на публичный адрес;
+5. запускает сервер в прод-режиме: `NODE_ENV=production`, слушает только `127.0.0.1`, так что
+   снаружи он доступен только через туннель;
+6. проверяет `/api/health` локально и через туннель и крупно печатает ссылку.
+
+| Что             | Адрес                                          |
+| --------------- | ---------------------------------------------- |
+| Публичная карта | `https://<адрес>.trycloudflare.com/`           |
+| Админка         | `https://<адрес>.trycloudflare.com/admin`      |
+| Проверка        | `https://<адрес>.trycloudflare.com/api/health` |
+
+Логи: `.demo/server.log`, `.demo/cloudflared.log`.
+
+**Прод-режим:**
+
+- пароль админа сгенерирован; seed не запустится с `admin123` или паролем короче 12 символов;
+- подсказки с демо-логином в сборке нет;
+- у JWT свой случайный секрет.
+
+**Если туннель не открывается (ошибка 1033).** Туннель идёт по `http2` (TCP 443): у части
+провайдеров QUIC (UDP) режется, и соединение рвётся. Новый поддомен появляется в DNS через
+10–20 секунд после запуска.
+
+### Разработка
+
+```bash
+npm run dev:server   # API + бот + Socket.IO на :3000 (tsx watch)
+npm run dev:web      # Vite на :5173 с прокси на :3000
+npm test             # vitest
+npm run bot:sim      # полный цикл бота без телефона
+```
 
 ## ИИ
 

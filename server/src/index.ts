@@ -30,7 +30,7 @@ const bot = await startBot(env, app).catch((err) => {
   return null;
 });
 
-await app.listen({ port: env.PORT, host: '0.0.0.0' });
+await app.listen({ port: env.PORT, host: env.HOST });
 // Локальная модель грузится в фоне: сервер уже принимает запросы
 warmupAi();
 

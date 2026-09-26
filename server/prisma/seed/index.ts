@@ -100,7 +100,16 @@ async function seedAdmin() {
   console.log(`✔ admin: ${email}`);
 }
 
+/** В проде демо-пароль недопустим: админка открыта в интернет. Проверяем до любых записей. */
+function assertProductionPassword() {
+  const password = process.env.ADMIN_PASSWORD ?? 'admin123';
+  if (process.env.NODE_ENV === 'production' && (password === 'admin123' || password.length < 12)) {
+    throw new Error('ADMIN_PASSWORD must be a generated password of 12+ chars in production');
+  }
+}
+
 async function main() {
+  assertProductionPassword();
   await seedZones();
   await seedExecutors();
   await seedAdmin();
