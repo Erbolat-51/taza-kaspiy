@@ -83,7 +83,8 @@ const endLabels: Plugin<'line'> = {
     chart.data.datasets.forEach((ds, i) => {
       const meta = chart.getDatasetMeta(i);
       const last = meta.data.at(-1);
-      if (!last || meta.hidden) return;
+      // Пустая серия (все нули) — подпись не нужна, иначе подписи слипаются у нуля
+      if (!last || meta.hidden || !(ds.data as number[]).some((v) => v > 0)) return;
       ctx.save();
       ctx.font = '600 11px Inter, sans-serif';
       ctx.fillStyle = INK.secondary;

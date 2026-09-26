@@ -7,6 +7,7 @@ import MapView from '../components/MapView.vue';
 import SidePanel from '../components/SidePanel.vue';
 import ReportCard from '../components/ReportCard.vue';
 import ToastStack from '../components/ToastStack.vue';
+import { botUrl } from '../lib/format';
 
 const store = useMapStore();
 const route = useRoute();
@@ -79,6 +80,25 @@ watch(
           {{ t('app.retry') }}
         </button>
       </div>
+    </div>
+
+    <!-- Пустая база: ещё ни одного сообщения — плашка исчезнет с первым репортом -->
+    <div
+      v-if="!store.loading && !store.error && !store.reports.length"
+      class="pointer-events-none absolute inset-x-0 bottom-24 z-[550] flex justify-center px-4 md:bottom-8 md:pl-[360px]"
+    >
+      <a
+        :href="botUrl"
+        target="_blank"
+        rel="noopener"
+        class="card pointer-events-auto flex items-center gap-3 px-4 py-3 text-sm hover:shadow-lg"
+      >
+        <span class="text-xl" aria-hidden="true">🌊</span>
+        <span>
+          <span class="block font-semibold">{{ t('mapNone.title') }}</span>
+          <span class="block text-xs text-muted">{{ t('mapNone.hint') }}</span>
+        </span>
+      </a>
     </div>
 
     <!-- Пустое состояние: по фильтрам ничего нет -->
