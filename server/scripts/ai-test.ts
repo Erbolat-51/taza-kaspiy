@@ -1,39 +1,61 @@
 /**
- * Проверка классификатора: npm run ai:test <фото> [<фото> ...] [--comment "текст"] [--mock]
- * Пути считаются от папки, из которой запущен npm (INIT_CWD).
+ * Проверка классификатора: npm run ai:test <фото|папка> [...] [--comment "текст"] [--mock]
+ * Пути считаются от папки, из которой запущен npm (INIT_CWD). В конце — сводная таблица.
  */
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { basename, extname, join, resolve } from 'node:path';
 import { classifyPhoto } from '../src/ai/classify.js';
+
+const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.gif']);
 
 const args = process.argv.slice(2);
 let comment: string | undefined;
-const files: string[] = [];
+const inputs: string[] = [];
 for (let i = 0; i < args.length; i++) {
   const a = args[i]!;
   if (a === '--comment') comment = args[++i];
-  else if (a === '--mock') delete process.env.ANTHROPIC_API_KEY;
-  else files.push(a);
+  else if (a === '--mock') process.env.ANTHROPIC_API_KEY = '';
+  else inputs.push(a);
 }
 
-if (files.length === 0) {
-  console.error('Usage: npm run ai:test <photo> [<photo> ...] [--comment "текст"] [--mock]');
+if (inputs.length === 0) {
+  console.error('Usage: npm run ai:test <photo|dir> [...] [--comment "текст"] [--mock]');
   process.exit(1);
 }
 
 const base = process.env.INIT_CWD ?? process.cwd();
-for (const f of files) {
-  const path = resolve(base, f);
-  const image = await readFile(path);
-  const r = await classifyPhoto({ image, comment });
-  const raw = r.raw as { ms?: number; fallbackReason?: string };
-  console.log(`\n📷 ${f}`);
-  console.log(
-    `   provider=${r.provider}  ${raw.ms} ms${raw.fallbackReason ? `  (fallback: ${raw.fallbackReason})` : ''}`,
-  );
-  console.log(
-    `   isPollution=${r.isPollution}  category=${r.category}  severity=${r.severity}/5  confidence=${r.confidence}`,
-  );
-  console.log(`   kk: ${r.summaryKk}`);
-  console.log(`   ru: ${r.summaryRu}`);
+const files: string[] = [];
+for (const input of inputs) {
+  const path = resolve(base, input);
+  if ((await stat(path)).isDirectory()) {
+    const entries = (await readdir(path)).filter((f) => IMAGE_EXT.has(extname(f).toLowerCase()));
+    files.push(...entries.sort().map((f) => join(path, f)));
+  } else {
+    files.push(path);
+  }
 }
+
+const rows: string[][] = [];
+for (const path of files) {
+  const r = await classifyPhoto({ image: await readFile(path), comment });
+  const raw = r.raw as { ms?: number; fallbackReason?: string };
+  console.log(`\n📷 ${basename(path)} — ${r.provider}, ${raw.ms} ms`);
+  console.log(`   kk: ${r.summaryKk}\n   ru: ${r.summaryRu}`);
+  rows.push([
+    basename(path),
+    r.category,
+    `${r.severity}/5`,
+    r.confidence.toFixed(2),
+    String(r.isPollution),
+    String(raw.ms),
+    r.provider + (raw.fallbackReason ? ` (${raw.fallbackReason})` : ''),
+  ]);
+}
+
+const header = ['файл', 'категория', 'severity', 'confidence', 'isPollution', 'ms', 'provider'];
+const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i]!.length)));
+const line = (cells: string[]) =>
+  '| ' + cells.map((c, i) => c.padEnd(widths[i]!)).join(' | ') + ' |';
+console.log('\n' + line(header));
+console.log('|' + widths.map((w) => '-'.repeat(w + 2)).join('|') + '|');
+rows.forEach((r) => console.log(line(r)));

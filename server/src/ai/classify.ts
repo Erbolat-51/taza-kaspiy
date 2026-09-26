@@ -10,8 +10,11 @@ export interface ClassifyInput {
   comment?: string | null;
 }
 
-const TIMEOUT_MS = 15_000;
-const MAX_RETRIES = 1;
+/** Общий бюджет на весь вызов, включая повтор: бот не должен ждать дольше. */
+const BUDGET_MS = 15_000;
+/** Повторяем, только если на вторую попытку осталось хотя бы столько. */
+const MIN_RETRY_MS = 3_000;
+const RETRY_DELAY_MS = 500;
 /** Длинная сторона фото для ИИ: меньше токенов и быстрее, деталей для классификации хватает. */
 const AI_IMAGE_EDGE = 1024;
 
@@ -49,7 +52,8 @@ let client: Anthropic | null = null;
 const getClient = () => {
   const key = process.env.ANTHROPIC_API_KEY?.trim();
   if (!key || key.toLowerCase() === 'none') return null;
-  client ??= new Anthropic({ apiKey: key, timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
+  // Повторы SDK отключены — ими управляет classifyPhoto в рамках общего бюджета
+  client ??= new Anthropic({ apiKey: key, timeout: BUDGET_MS, maxRetries: 0 });
   return client;
 };
 
@@ -57,41 +61,35 @@ const model = () => process.env.AI_MODEL || 'claude-sonnet-5';
 
 async function classifyWithClaude(
   claude: Anthropic,
-  input: ClassifyInput,
+  jpeg: Buffer,
+  comment: string | undefined,
+  timeoutMs: number,
 ): Promise<ClassifyResult | null> {
-  const jpeg = await sharp(input.image)
-    .resize({
-      width: AI_IMAGE_EDGE,
-      height: AI_IMAGE_EDGE,
-      fit: 'inside',
-      withoutEnlargement: true,
-    })
-    .jpeg({ quality: 85 })
-    .toBuffer();
-
-  const comment = input.comment?.trim();
-  const response = await claude.messages.parse({
-    model: model(),
-    max_tokens: 1024,
-    // Классификация — простая задача: низкий effort даёт ответ за секунды
-    output_config: { effort: 'low', format: zodOutputFormat(ClassificationSchema) },
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/jpeg', data: jpeg.toString('base64') },
-          },
-          {
-            type: 'text',
-            text: comment ? `Комментарий жителя: «${comment.slice(0, 500)}»` : 'Комментария нет.',
-          },
-        ],
-      },
-    ],
-  });
+  const response = await claude.messages.parse(
+    {
+      model: model(),
+      max_tokens: 1024,
+      // Классификация — простая задача: низкий effort даёт ответ за секунды
+      output_config: { effort: 'low', format: zodOutputFormat(ClassificationSchema) },
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/jpeg', data: jpeg.toString('base64') },
+            },
+            {
+              type: 'text',
+              text: comment ? `Комментарий жителя: «${comment.slice(0, 500)}»` : 'Комментария нет.',
+            },
+          ],
+        },
+      ],
+    },
+    { timeout: timeoutMs },
+  );
 
   if (response.stop_reason === 'refusal' || !response.parsed_output) {
     logger.warn(
@@ -107,37 +105,87 @@ async function classifyWithClaude(
   };
 }
 
+function failureReason(err: unknown): string {
+  // Порядок важен: TimeoutError — подкласс ConnectionError
+  if (err instanceof Anthropic.APIConnectionTimeoutError) return 'timeout';
+  if (err instanceof Anthropic.APIConnectionError) return 'network';
+  if (err instanceof Anthropic.RateLimitError) return 'rate_limit';
+  if (err instanceof Anthropic.AuthenticationError) return 'auth';
+  if (err instanceof Anthropic.APIError) return `api_${err.status ?? 'error'}`;
+  return 'error';
+}
+
+/** Повтор имеет смысл только для временных сбоев: 429, 5xx, сеть. Таймаут не повторяем. */
+function isRetryable(err: unknown): boolean {
+  if (err instanceof Anthropic.APIConnectionTimeoutError) return false;
+  if (err instanceof Anthropic.APIConnectionError) return true;
+  if (err instanceof Anthropic.APIError) return err.status === 429 || (err.status ?? 0) >= 500;
+  return false;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Классификация фото: Claude vision (таймаут 15 с, 1 повтор), при любой ошибке — mock.
- * Никогда не бросает исключений: демо не должно падать.
+ * Классификация фото: Claude vision с общим бюджетом 15 с и максимум одним повтором
+ * (только на 429/5xx/сеть), при любой неудаче — mock. Никогда не бросает исключений.
  */
 export async function classifyPhoto(input: ClassifyInput): Promise<ClassifyResult> {
   const started = performance.now();
+  const elapsed = () => performance.now() - started;
   const claude = getClient();
   let result: ClassifyResult | null = null;
   let fallbackReason: string | null = claude ? null : 'no_api_key';
+  let attempts = 0;
 
   if (claude) {
     try {
-      result = await classifyWithClaude(claude, input);
-      if (!result) fallbackReason = 'unparsed';
+      const jpeg = await sharp(input.image)
+        .resize({
+          width: AI_IMAGE_EDGE,
+          height: AI_IMAGE_EDGE,
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+      const comment = input.comment?.trim() || undefined;
+
+      while (attempts < 2) {
+        attempts++;
+        try {
+          result = await classifyWithClaude(
+            claude,
+            jpeg,
+            comment,
+            Math.floor(BUDGET_MS - elapsed()),
+          );
+          fallbackReason = result ? null : 'unparsed';
+          break;
+        } catch (err) {
+          fallbackReason = failureReason(err);
+          const canRetry =
+            attempts < 2 &&
+            isRetryable(err) &&
+            BUDGET_MS - elapsed() - RETRY_DELAY_MS >= MIN_RETRY_MS;
+          logger.warn(
+            {
+              attempt: attempts,
+              reason: fallbackReason,
+              willRetry: canRetry,
+              ...(err instanceof Anthropic.APIError
+                ? { status: err.status, requestId: err.requestID }
+                : {}),
+              message: err instanceof Error ? err.message.slice(0, 200) : String(err),
+            },
+            `ai: claude attempt ${attempts} failed (${fallbackReason})`,
+          );
+          if (!canRetry) break;
+          await sleep(RETRY_DELAY_MS);
+        }
+      }
     } catch (err) {
-      fallbackReason =
-        err instanceof Anthropic.APIConnectionTimeoutError
-          ? 'timeout'
-          : err instanceof Anthropic.RateLimitError
-            ? 'rate_limit'
-            : err instanceof Anthropic.AuthenticationError
-              ? 'auth'
-              : err instanceof Anthropic.APIError
-                ? `api_${err.status ?? 'error'}`
-                : 'error';
-      logger.error(
-        err instanceof Anthropic.APIError
-          ? { status: err.status, requestId: err.requestID, message: err.message.slice(0, 200) }
-          : { err },
-        `ai: claude request failed (${fallbackReason})`,
-      );
+      fallbackReason = 'bad_image';
+      logger.warn({ err }, 'ai: could not prepare image');
     }
   }
 
@@ -152,6 +200,7 @@ export async function classifyPhoto(input: ClassifyInput): Promise<ClassifyResul
       provider: result.provider,
       model: result.provider === 'claude' ? model() : undefined,
       ms,
+      ...(attempts > 1 && { attempts }),
       isPollution: result.isPollution,
       category: result.category,
       severity: result.severity,
