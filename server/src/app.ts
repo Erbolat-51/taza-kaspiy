@@ -77,3 +77,5 @@ export async function buildApp(env: Env) {
 
   return app;
 }
+
+export type App = Awaited<ReturnType<typeof buildApp>>;

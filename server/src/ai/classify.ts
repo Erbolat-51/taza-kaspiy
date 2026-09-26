@@ -48,6 +48,9 @@ summaryKk и summaryRu — одно короткое предложение (д�
 и русском. Пиши нейтрально, без оценок и без советов.
 Комментарий жителя может помочь, но опирайся прежде всего на фото.`;
 
+/** Настроен ли реальный ИИ (для текста «ЖИ талдап жатыр…» в боте). */
+export const aiEnabled = () => getClient() !== null;
+
 let client: Anthropic | null = null;
 const getClient = () => {
   const key = process.env.ANTHROPIC_API_KEY?.trim();

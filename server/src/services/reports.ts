@@ -4,6 +4,7 @@ import { prisma } from '../db.js';
 import { bus } from '../lib/bus.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { classifyPhoto } from '../ai/classify.js';
+import { DEFAULT_SEVERITY } from '../ai/mock.js';
 import type { ClassifyResult } from '../ai/types.js';
 import { OPEN_STATUSES, isOpen } from '../domain/constants.js';
 import { DUPLICATE_WINDOW_MS, duplicateBBox, findDuplicateParent } from '../domain/duplicates.js';
@@ -365,4 +366,46 @@ export async function addAfterPhoto(
   bus.emit('report:updated', { report, change: { type: 'afterPhoto' }, actor });
 
   return current.status === 'RESOLVED' ? report : changeStatus(id, 'RESOLVED', actor);
+}
+
+/**
+ * Житель подтвердил категорию (category = null) или выбрал другую.
+ * Если ИИ не работал (mock), severity берём по умолчанию для выбранной категории.
+ */
+export async function setCategoryByUser(
+  id: number,
+  tgUserId: number,
+  category: Category | null,
+): Promise<ReportWithRefs> {
+  const current = await prisma.report.findUnique({ where: { id } });
+  if (!current || current.tgUserId !== tgUserId) throw notFound();
+  const to = category ?? current.category;
+  const wasMock = (current.aiRaw as { provider?: string } | null)?.provider === 'mock';
+  const severity = category && wasMock ? DEFAULT_SEVERITY[to] : current.severity;
+
+  const [report] = await prisma.$transaction([
+    prisma.report.update({
+      where: { id },
+      data: { category: to, severity, categoryConfirmedByUser: true },
+      include: reportInclude,
+    }),
+    prisma.reportEvent.create({
+      data: {
+        reportId: id,
+        type: 'COMMENT',
+        actor: `tg:${tgUserId}`,
+        payload: { kind: 'category', from: current.category, to, confirmed: category === null },
+      },
+    }),
+  ]);
+
+  if (to !== current.category) {
+    if (report.zoneId && severity !== current.severity) await recalcZoneIndex(report.zoneId);
+    bus.emit('report:updated', {
+      report,
+      change: { type: 'category', from: current.category, to },
+      actor: `tg:${tgUserId}`,
+    });
+  }
+  return report;
 }

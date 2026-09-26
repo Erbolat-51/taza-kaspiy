@@ -19,7 +19,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "ai:test": "npm run ai:test -w server --",
-    "test": "npm test -w server"
+    "test": "npm test -w server",
+    "bot:sim": "npm run bot:sim -w server --"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

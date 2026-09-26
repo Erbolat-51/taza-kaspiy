@@ -37,6 +37,17 @@ const SUMMARY: Record<Category, { kk: string; ru: string }> = {
   OTHER: { kk: 'Ластану', ru: 'Загрязнение' },
 };
 
+/** Severity по умолчанию, когда категорию выбрал сам житель (ИИ недоступен). */
+export const DEFAULT_SEVERITY: Record<Category, number> = {
+  OIL: 5,
+  DEAD_ANIMAL: 4,
+  SEWAGE: 4,
+  PLASTIC: 3,
+  CONSTRUCTION: 3,
+  TRASH: 2,
+  OTHER: 2,
+};
+
 /** Классификатор без ИИ: по ключевым словам комментария. Никогда не бросает исключений. */
 export function mockClassify(comment?: string | null): ClassifyResult {
   const text = (comment ?? '').toLowerCase();

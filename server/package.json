@@ -14,7 +14,8 @@
     "db:studio": "dotenv -e ../.env -- prisma studio",
     "seed": "dotenv -e ../.env -- prisma migrate deploy && dotenv -e ../.env -- tsx prisma/seed/index.ts",
     "test": "vitest run",
-    "ai:test": "dotenv -e ../.env -- tsx scripts/ai-test.ts"
+    "ai:test": "dotenv -e ../.env -- tsx scripts/ai-test.ts",
+    "bot:sim": "dotenv -e ../.env -- tsx scripts/bot-sim.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -27,6 +28,7 @@
     "bcryptjs": "^3.0.3",
     "fastify": "^5.12.5",
     "fastify-plugin": "^5.1.0",
+    "grammy": "^1.46.0",
     "pino": "^10.3.1",
     "sharp": "^0.35.4",
     "socket.io": "^4.8.4",

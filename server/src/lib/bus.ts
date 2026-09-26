@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import type { ReportStatus } from '@prisma/client';
+import type { Category, ReportStatus } from '@prisma/client';
 import type { ReportWithRefs } from '../services/reportShape.js';
 
 /**
@@ -10,7 +10,8 @@ export type ReportChange =
   | { type: 'status'; from: ReportStatus; to: ReportStatus }
   | { type: 'assigned'; executorId: number }
   | { type: 'afterPhoto' }
-  | { type: 'duplicate'; childId: number };
+  | { type: 'duplicate'; childId: number }
+  | { type: 'category'; from: Category; to: Category };
 
 export interface BusEvents {
   'report:created': { report: ReportWithRefs; duplicateOf: number | null };
