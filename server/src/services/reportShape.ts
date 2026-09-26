@@ -17,7 +17,7 @@ export function toPublic<T extends { aiRaw: unknown; tgUserId: number | null }>(
   return { ...rest, aiProvider };
 }
 
-/** Роль автора события без персональных данных: "admin:ivan@taza.kz" → "admin". */
+/** Роль автора события без персональных данных: "admin:operator@taza.kz" → "admin". */
 export const publicActor = (actor: string) => {
   const role = actor.split(':')[0] ?? 'system';
   return role === 'tg' || role === 'bot' ? 'resident' : role;
