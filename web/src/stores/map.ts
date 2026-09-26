@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { computed, reactive, ref } from 'vue';
-import { io, type Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
+import { getSocket } from '../lib/socket';
 import { api } from '../api';
 import { i18n } from '../i18n';
 import { statusGroup, type StatusGroup } from '../lib/meta';
@@ -116,7 +117,8 @@ export const useMapStore = defineStore('map', () => {
   let socket: Socket | null = null;
   function connect() {
     if (socket) return;
-    socket = io({ path: '/socket.io', transports: ['websocket', 'polling'] });
+    socket = getSocket();
+    connected.value = socket.connected;
     let wasConnected = false;
     socket.on('connect', () => {
       // Переподключение: пока связи не было, могли пропустить события — перечитываем

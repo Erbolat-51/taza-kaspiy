@@ -19,6 +19,7 @@ import reportRoutes from './routes/reports.js';
 import zoneRoutes from './routes/zones.js';
 import executorRoutes from './routes/executors.js';
 import statsRoutes from './routes/stats.js';
+import adminRoutes from './routes/admin.js';
 
 export const corsOrigins = (env: Env) => [env.PUBLIC_URL, 'http://localhost:5173'];
 
@@ -55,6 +56,9 @@ export async function buildApp(env: Env) {
         .code(err.statusCode)
         .send({ error: err.code, message: err.message, ...err.details });
     }
+    if ('code' in err && err.code === 'P2025') {
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Not found' });
+    }
     const status = 'statusCode' in err && err.statusCode ? err.statusCode : 500;
     if (status >= 500) req.log.error({ err }, 'unhandled error');
     return reply.code(status).send({
@@ -78,6 +82,7 @@ export async function buildApp(env: Env) {
   await app.register(zoneRoutes);
   await app.register(executorRoutes);
   await app.register(statsRoutes);
+  await app.register(adminRoutes);
 
   // Собранный фронт (web/dist): в проде — всегда, в dev — если сделан `npm run build -w web`
   const webDist = resolve(process.env.WEB_DIST ?? '../web/dist');

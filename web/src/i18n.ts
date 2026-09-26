@@ -5,6 +5,8 @@ import 'dayjs/locale/kk';
 import 'dayjs/locale/ru';
 import kk from './locales/kk';
 import ru from './locales/ru';
+import adminKk from './locales/admin.kk';
+import adminRu from './locales/admin.ru';
 import type { Lang } from './types';
 
 dayjs.extend(relativeTime);
@@ -22,7 +24,7 @@ export const i18n = createI18n({
   legacy: false,
   locale: initial,
   fallbackLocale: 'ru',
-  messages: { kk, ru },
+  messages: { kk: { ...kk, admin: adminKk }, ru: { ...ru, admin: adminRu } },
 });
 
 dayjs.locale(initial);
