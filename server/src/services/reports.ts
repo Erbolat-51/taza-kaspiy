@@ -52,7 +52,12 @@ export async function createReport(input: CreateReportInput): Promise<CreateRepo
     input.classification ??
     (await classifyPhoto({ image: processed.full, comment: input.comment }));
   if (!ai.isPollution) {
-    throw new AppError(422, 'NOT_POLLUTION', 'На фото не обнаружено загрязнения');
+    // Чистый пляж / селфи / скриншот: репорт не создаём, фото на диск не пишем
+    throw new AppError(422, 'NOT_POLLUTION', 'На фото не обнаружено загрязнения', {
+      summaryKk: ai.summaryKk,
+      summaryRu: ai.summaryRu,
+      aiProvider: ai.provider,
+    });
   }
 
   const [files, zone] = await Promise.all([

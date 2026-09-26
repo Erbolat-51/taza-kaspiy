@@ -51,7 +51,9 @@ export async function buildApp(env: Env) {
       });
     }
     if (err instanceof AppError) {
-      return reply.code(err.statusCode).send({ error: err.code, message: err.message });
+      return reply
+        .code(err.statusCode)
+        .send({ error: err.code, message: err.message, ...err.details });
     }
     const status = 'statusCode' in err && err.statusCode ? err.statusCode : 500;
     if (status >= 500) req.log.error({ err }, 'unhandled error');

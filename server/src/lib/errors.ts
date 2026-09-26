@@ -4,6 +4,8 @@ export class AppError extends Error {
     public readonly statusCode: number,
     public readonly code: string,
     message?: string,
+    /** Доп. поля в ответе (например, описание ИИ для 422 NOT_POLLUTION) */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message ?? code);
   }
