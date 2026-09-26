@@ -28,7 +28,8 @@
     "build": "npm run build -w web && npm run build -w server",
     "start": "npm run start -w server",
     "demo:seed": "npm run demo:seed -w server",
-    "demo:reset": "npm run demo:reset -w server --"
+    "demo:reset": "npm run demo:reset -w server --",
+    "db:clean": "npm run db:clean -w server --"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

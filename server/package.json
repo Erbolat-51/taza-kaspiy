@@ -18,7 +18,8 @@
     "bot:sim": "dotenv -e ../.env -- tsx scripts/bot-sim.ts",
     "start": "node --env-file=../.env dist/src/index.js",
     "demo:seed": "dotenv -e ../.env -- tsx prisma/seed/demo.ts",
-    "demo:reset": "dotenv -e ../.env -- tsx prisma/seed/reset.ts"
+    "demo:reset": "dotenv -e ../.env -- tsx prisma/seed/reset.ts",
+    "db:clean": "dotenv -e ../.env -- tsx prisma/seed/clean.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

@@ -7,13 +7,19 @@ import { OPEN_STATUSES } from '../domain/constants.js';
 
 export type CachedZone = Omit<Zone, 'polygon'> & { polygon: PolygonGeometry };
 
-/** Зоны меняются только через seed — держим их в памяти, чтобы lookup был мгновенным. */
+/**
+ * Зоны держим в памяти, чтобы lookup был мгновенным. Кэш живёт 30 с: скрипты вне сервера
+ * (seed, db:clean) меняют индексы в БД, и запущенный сервер подхватывает их без перезапуска.
+ */
+const CACHE_TTL_MS = 30_000;
 let cache: CachedZone[] | null = null;
+let loadedAt = 0;
 
 export async function getZones(): Promise<CachedZone[]> {
-  if (!cache) {
+  if (!cache || Date.now() - loadedAt > CACHE_TTL_MS) {
     const rows = await prisma.zone.findMany({ orderBy: { id: 'asc' } });
     cache = rows.map((z) => ({ ...z, polygon: z.polygon as unknown as PolygonGeometry }));
+    loadedAt = Date.now();
   }
   return cache;
 }

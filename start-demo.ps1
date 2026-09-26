@@ -16,7 +16,9 @@
   .\start-demo.ps1            # обычный запуск
   .\start-demo.ps1 -Rebuild   # пересобрать web и server перед запуском
 #>
-param([switch]$Rebuild)
+param([switch]$Rebuild, [switch]$ServerOnly)
+# -ServerOnly: перезапустить только сервер (например, после npm run db:clean);
+#              туннель и публичная ссылка остаются прежними.
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -34,7 +36,21 @@ if (-not (Test-Path $envFile)) { Fail '.env не найден — скопиру
 New-Item -ItemType Directory -Force $demoDir | Out-Null
 
 # 0. Предыдущий запуск
-& (Join-Path $root 'stop-demo.ps1') -Quiet
+$pidsFile = Join-Path $demoDir 'pids.json'
+if ($ServerOnly) {
+  # Туннель оставляем, перезапускаем только сервер — ссылка не меняется
+  if (-not (Test-Path $pidsFile)) { Fail 'Демо не запущено — запустите без -ServerOnly' }
+  $prev = Get-Content $pidsFile -Raw | ConvertFrom-Json
+  if (-not (Get-Process -Id $prev.cloudflared -ErrorAction SilentlyContinue)) {
+    Fail 'Туннель не работает — запустите без -ServerOnly'
+  }
+  if (Get-Process -Id $prev.server -ErrorAction SilentlyContinue) {
+    taskkill /PID $prev.server /T /F 2>$null | Out-Null
+  }
+  Start-Sleep -Milliseconds 500
+} else {
+  & (Join-Path $root 'stop-demo.ps1') -Quiet
+}
 
 # 1. cloudflared
 $cf = (Get-Command cloudflared -ErrorAction SilentlyContinue).Source
@@ -61,6 +77,11 @@ try {
 } finally { Pop-Location }
 
 # 3. Туннель
+if ($ServerOnly) {
+  $cfProc = Get-Process -Id $prev.cloudflared
+  $publicUrl = $prev.url
+  Step "Туннель работает: $publicUrl"
+} else {
 Step 'Запуск Cloudflare quick tunnel…'
 $cfLog = Join-Path $demoDir 'cloudflared.log'
 Remove-Item $cfLog -ErrorAction SilentlyContinue
@@ -89,6 +110,7 @@ if ($text -match '(?m)^PUBLIC_URL=.*$') {
   $text = $text.TrimEnd() + "`nPUBLIC_URL=$publicUrl`n"
 }
 [System.IO.File]::WriteAllText($envFile, $text, (New-Object System.Text.UTF8Encoding $false))
+}
 
 # 5. Сервер в прод-режиме (переменные окружения важнее .env — так задумано Node --env-file)
 Step 'Запуск сервера (NODE_ENV=production)…'
