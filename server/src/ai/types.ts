@@ -14,6 +14,6 @@ export type Classification = z.infer<typeof ClassificationSchema>;
 
 export interface ClassifyResult extends Classification {
   /** Откуда пришёл результат */
-  provider: 'claude' | 'mock';
+  provider: 'claude' | 'clip' | 'mock';
   raw: unknown;
 }

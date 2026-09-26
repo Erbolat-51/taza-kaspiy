@@ -5,6 +5,8 @@ import { prisma } from './db.js';
 import { bus } from './lib/bus.js';
 import { recalcAllZones } from './services/zones.js';
 import { startBot } from './bot/index.js';
+import { warmupAi } from './ai/classify.js';
+import { stopClip } from './ai/clip.js';
 
 const env = loadEnv();
 const app = await buildApp(env);
@@ -29,11 +31,14 @@ const bot = await startBot(env, app).catch((err) => {
 });
 
 await app.listen({ port: env.PORT, host: '0.0.0.0' });
+// Локальная модель грузится в фоне: сервер уже принимает запросы
+warmupAi();
 
 const shutdown = async (signal: string) => {
   app.log.info(`${signal}: shutting down`);
   clearInterval(timer);
   await bot?.stop().catch(() => {});
+  stopClip();
   io.disconnectSockets(true);
   await app.close();
   await prisma.$disconnect();

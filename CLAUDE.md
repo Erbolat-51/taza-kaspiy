@@ -185,3 +185,8 @@ ADMIN_PASSWORD=admin123
 - **Бот, результат ИИ (Фаза 3):** если `provider=mock` — не писать «ЖИ анықтады», а попросить выбрать категорию
   кнопками. Если `confidence < 0.6` — показать результат, но кнопки «✅ Дұрыс / ✏️ Өзгерту» выделить
   (явный вопрос «Дұрыс па?»).
+- **ИИ-цепочка:** `AI_PROVIDER=auto` → claude (есть ключ) → clip (локально, дочерний процесс) → mock.
+  Бот: `provider=clip` ведёт себя как claude («ЖИ анықтады» + правило confidence < 0.6); `mock` — выбор кнопками.
+  В `aiRaw`: provider, model, top3. Windows: нужен VC++ Redistributable ≥ 14.40 (иначе CLIP → mock).
+- **Фаза 8 / Docker:** модель CLIP (~150 МБ) кэшировать в volume `./models` или запекать в образ; onnxruntime-node
+  на Linux работает без install-скрипта (CPU-бинарники в пакете).

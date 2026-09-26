@@ -27,7 +27,7 @@ const RULES: { category: Category; severity: number; words: string[] }[] = [
   { category: 'TRASH', severity: 2, words: ['қоқыс', 'мусор', 'қалдық', 'отход', 'свалк'] },
 ];
 
-const SUMMARY: Record<Category, { kk: string; ru: string }> = {
+export const SUMMARY: Record<Category, { kk: string; ru: string }> = {
   TRASH: { kk: 'Жағалаудағы тұрмыстық қоқыс', ru: 'Бытовой мусор на берегу' },
   PLASTIC: { kk: 'Жағалаудағы пластик қоқыс', ru: 'Пластиковый мусор на берегу' },
   OIL: { kk: 'Мұнай ластануының белгілері', ru: 'Признаки нефтяного загрязнения' },

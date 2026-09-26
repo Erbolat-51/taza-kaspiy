@@ -9,6 +9,8 @@ const EnvSchema = z.object({
   PUBLIC_URL: z.string().url().default('http://localhost:3000'),
   ANTHROPIC_API_KEY: z.string().default(''),
   AI_MODEL: z.string().default('claude-sonnet-5'),
+  AI_PROVIDER: z.enum(['auto', 'claude', 'clip', 'mock']).default('auto'),
+  MODELS_DIR: z.string().default('./models'),
   JWT_SECRET: z.string().min(8),
   ADMIN_EMAIL: z.string().email().default('admin@taza.kz'),
   ADMIN_PASSWORD: z.string().min(6).default('admin123'),

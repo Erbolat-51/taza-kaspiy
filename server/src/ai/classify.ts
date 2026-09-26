@@ -3,6 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import sharp from 'sharp';
 import { logger } from '../lib/logger.js';
 import { mockClassify } from './mock.js';
+import { classifyWithClip, clipAvailable, warmupClip } from './clip.js';
 import { ClassificationSchema, type ClassifyResult } from './types.js';
 
 export interface ClassifyInput {
@@ -47,9 +48,6 @@ confidence 0–1 — насколько ты уверен в категории.
 summaryKk и summaryRu — одно короткое предложение (до 120 символов) о том, что на фото, на казахском
 и русском. Пиши нейтрально, без оценок и без советов.
 Комментарий жителя может помочь, но опирайся прежде всего на фото.`;
-
-/** Настроен ли реальный ИИ (для текста «ЖИ талдап жатыр…» в боте). */
-export const aiEnabled = () => getClient() !== null;
 
 let client: Anthropic | null = null;
 const getClient = () => {
@@ -128,90 +126,144 @@ function isRetryable(err: unknown): boolean {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+type ProviderName = 'claude' | 'clip' | 'mock';
+type Attempt = { result: ClassifyResult | null; reason: string | null; attempts: number };
+
 /**
- * Классификация фото: Claude vision с общим бюджетом 15 с и максимум одним повтором
- * (только на 429/5xx/сеть), при любой неудаче — mock. Никогда не бросает исключений.
+ * Цепочка провайдеров из AI_PROVIDER (auto | claude | clip | mock):
+ * auto → claude (если есть ключ) → clip (локально) → mock. Mock — всегда последний.
+ */
+export function providerChain(): ProviderName[] {
+  const setting = (process.env.AI_PROVIDER ?? 'auto').toLowerCase();
+  if (setting === 'mock') return ['mock'];
+  if (setting === 'claude') return ['claude', 'mock'];
+  if (setting === 'clip') return ['clip', 'mock'];
+  return [...(getClient() ? (['claude'] as const) : []), 'clip', 'mock'];
+}
+
+/** Работает ли настоящий ИИ (для текста «ЖИ талдап жатыр…» в боте). */
+export const aiEnabled = () =>
+  providerChain().some((p) => (p === 'claude' ? !!getClient() : p === 'clip' && clipAvailable()));
+
+/** Прогрев локальной модели при старте — в фоне, listen не ждёт. */
+export function warmupAi() {
+  if (!providerChain().includes('clip')) return;
+  warmupClip().catch(() => {
+    /* уже залогировано в clip.ts; работаем на claude/mock */
+  });
+}
+
+/** Claude с общим бюджетом 15 с и максимум одним повтором (только 429/5xx/сеть). */
+async function runClaude(input: ClassifyInput): Promise<Attempt> {
+  const claude = getClient();
+  if (!claude) return { result: null, reason: 'no_api_key', attempts: 0 };
+  const started = performance.now();
+  const elapsed = () => performance.now() - started;
+  const jpeg = await sharp(input.image)
+    .resize({
+      width: AI_IMAGE_EDGE,
+      height: AI_IMAGE_EDGE,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  const comment = input.comment?.trim() || undefined;
+
+  let reason: string | null = null;
+  let attempts = 0;
+  while (attempts < 2) {
+    attempts++;
+    try {
+      const result = await classifyWithClaude(
+        claude,
+        jpeg,
+        comment,
+        Math.floor(BUDGET_MS - elapsed()),
+      );
+      return { result, reason: result ? null : 'unparsed', attempts };
+    } catch (err) {
+      reason = failureReason(err);
+      const canRetry =
+        attempts < 2 && isRetryable(err) && BUDGET_MS - elapsed() - RETRY_DELAY_MS >= MIN_RETRY_MS;
+      logger.warn(
+        {
+          attempt: attempts,
+          reason,
+          willRetry: canRetry,
+          ...(err instanceof Anthropic.APIError
+            ? { status: err.status, requestId: err.requestID }
+            : {}),
+          message: err instanceof Error ? err.message.slice(0, 200) : String(err),
+        },
+        `ai: claude attempt ${attempts} failed (${reason})`,
+      );
+      if (!canRetry) break;
+      await sleep(RETRY_DELAY_MS);
+    }
+  }
+  return { result: null, reason, attempts };
+}
+
+async function runClip(input: ClassifyInput): Promise<Attempt> {
+  try {
+    return { result: await classifyWithClip(input.image), reason: null, attempts: 1 };
+  } catch (err) {
+    logger.warn({ reason: err instanceof Error ? err.message : String(err) }, 'ai: clip failed');
+    return { result: null, reason: 'clip_error', attempts: 1 };
+  }
+}
+
+/**
+ * Классификация фото по цепочке провайдеров; при неудаче — следующий, в конце mock.
+ * Никогда не бросает исключений: демо не должно падать.
  */
 export async function classifyPhoto(input: ClassifyInput): Promise<ClassifyResult> {
   const started = performance.now();
-  const elapsed = () => performance.now() - started;
-  const claude = getClient();
+  const fallbacks: string[] = [];
   let result: ClassifyResult | null = null;
-  let fallbackReason: string | null = claude ? null : 'no_api_key';
   let attempts = 0;
 
-  if (claude) {
-    try {
-      const jpeg = await sharp(input.image)
-        .resize({
-          width: AI_IMAGE_EDGE,
-          height: AI_IMAGE_EDGE,
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .jpeg({ quality: 85 })
-        .toBuffer();
-      const comment = input.comment?.trim() || undefined;
-
-      while (attempts < 2) {
-        attempts++;
-        try {
-          result = await classifyWithClaude(
-            claude,
-            jpeg,
-            comment,
-            Math.floor(BUDGET_MS - elapsed()),
-          );
-          fallbackReason = result ? null : 'unparsed';
-          break;
-        } catch (err) {
-          fallbackReason = failureReason(err);
-          const canRetry =
-            attempts < 2 &&
-            isRetryable(err) &&
-            BUDGET_MS - elapsed() - RETRY_DELAY_MS >= MIN_RETRY_MS;
-          logger.warn(
-            {
-              attempt: attempts,
-              reason: fallbackReason,
-              willRetry: canRetry,
-              ...(err instanceof Anthropic.APIError
-                ? { status: err.status, requestId: err.requestID }
-                : {}),
-              message: err instanceof Error ? err.message.slice(0, 200) : String(err),
-            },
-            `ai: claude attempt ${attempts} failed (${fallbackReason})`,
-          );
-          if (!canRetry) break;
-          await sleep(RETRY_DELAY_MS);
-        }
-      }
-    } catch (err) {
-      fallbackReason = 'bad_image';
-      logger.warn({ err }, 'ai: could not prepare image');
+  for (const provider of providerChain()) {
+    if (provider === 'mock') {
+      result = mockClassify(input.comment);
+      break;
     }
+    const t0 = performance.now();
+    const a = await (provider === 'claude' ? runClaude(input) : runClip(input)).catch(
+      (err: unknown): Attempt => {
+        logger.warn({ err }, `ai: ${provider} crashed`);
+        return { result: null, reason: 'bad_image', attempts: 1 };
+      },
+    );
+    attempts += a.attempts;
+    if (a.result) {
+      (a.result.raw as Record<string, unknown>).providerMs = Math.round(performance.now() - t0);
+      result = a.result;
+      break;
+    }
+    fallbacks.push(`${provider}:${a.reason}`);
   }
-
-  if (!result) {
-    result = mockClassify(input.comment);
-    result.raw = { ...(result.raw as object), fallbackReason };
-  }
+  result ??= mockClassify(input.comment);
 
   const ms = Math.round(performance.now() - started);
+  const raw = result.raw as Record<string, unknown>;
+  raw.ms = ms;
+  if (fallbacks.length) raw.fallbackReason = fallbacks.join(' → ');
   logger.info(
     {
       provider: result.provider,
-      model: result.provider === 'claude' ? model() : undefined,
+      model: raw.model,
       ms,
       ...(attempts > 1 && { attempts }),
       isPollution: result.isPollution,
       category: result.category,
       severity: result.severity,
       confidence: result.confidence,
-      ...(fallbackReason && { fallbackReason }),
+      ...(raw.top3 ? { top3: raw.top3 } : {}),
+      ...(fallbacks.length && { fallback: raw.fallbackReason }),
     },
     `ai: classified in ${ms} ms via ${result.provider}`,
   );
-  (result.raw as Record<string, unknown>).ms = ms;
   return result;
 }

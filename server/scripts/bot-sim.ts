@@ -15,6 +15,7 @@ import { dict } from '../src/bot/i18n.js';
 import { configureUploads } from '../src/services/photos.js';
 import { addAfterPhoto, assignExecutor, changeStatus } from '../src/services/reports.js';
 import { prisma } from '../src/db.js';
+import { stopClip } from '../src/ai/clip.js';
 
 const env = loadEnv({
   ...process.env,
@@ -166,3 +167,4 @@ await addAfterPhoto(report.id, after, 'admin:sim');
 await new Promise((r) => setTimeout(r, 1500)); // уведомления асинхронные
 unsubscribe();
 await prisma.$disconnect();
+stopClip();
