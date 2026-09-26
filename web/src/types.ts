@@ -83,6 +83,8 @@ export interface Zone extends ZoneRef {
   cleanIndex: number;
   color: 'green' | 'yellow' | 'red';
   openCount: number;
+  resolved30d: number;
+  lastReportAt: string | null;
 }
 
 export interface Summary {

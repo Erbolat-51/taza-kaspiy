@@ -94,6 +94,15 @@ const periods: { v: PeriodFilter; key: string }[] = [
         </span>
       </a>
 
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <RouterLink to="/zones" class="btn justify-center !py-2"
+          >🏆 {{ t('nav.zones') }}</RouterLink
+        >
+        <RouterLink to="/report" class="btn justify-center !py-2"
+          >✍️ {{ t('nav.report') }}</RouterLink
+        >
+      </div>
+
       <!-- Статус -->
       <section>
         <div class="mb-2 flex items-center justify-between">

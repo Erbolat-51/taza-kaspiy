@@ -5,6 +5,8 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'map', component: MapPage },
+    { path: '/zones', name: 'zones', component: () => import('./pages/ZonesPage.vue') },
+    { path: '/report', name: 'report', component: () => import('./pages/ReportPage.vue') },
     // Админка — отдельный чанк: жителям на карте не нужен код графиков
     {
       path: '/admin/login',

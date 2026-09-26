@@ -81,6 +81,23 @@ watch(
       </div>
     </div>
 
+    <!-- Пустое состояние: по фильтрам ничего нет -->
+    <div
+      v-if="!store.loading && !store.error && store.reports.length && !store.visible.length"
+      class="pointer-events-none absolute inset-x-0 bottom-24 z-[550] flex justify-center px-4 md:bottom-8 md:pl-[360px]"
+    >
+      <div class="card pointer-events-auto flex items-center gap-3 px-4 py-3 text-sm">
+        <span aria-hidden="true">🔍</span>
+        <div>
+          <p class="font-semibold">{{ t('mapEmpty.title') }}</p>
+          <p class="text-xs text-muted">{{ t('mapEmpty.hint') }}</p>
+        </div>
+        <button type="button" class="btn" @click="store.resetFilters()">
+          {{ t('filters.reset') }}
+        </button>
+      </div>
+    </div>
+
     <ToastStack />
   </main>
 </template>

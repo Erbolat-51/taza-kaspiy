@@ -12,19 +12,30 @@ const LookupQuery = z.object({
 
 export default async function zoneRoutes(app: FastifyInstance) {
   app.get('/api/zones', async () => {
-    const [zones, openCounts] = await Promise.all([
+    const monthAgo = new Date(Date.now() - 30 * 86_400_000);
+    const [zones, openCounts, resolvedCounts, lastReports] = await Promise.all([
       getZones(),
       prisma.report.groupBy({
         by: ['zoneId'],
         where: { parentId: null, status: { in: OPEN_STATUSES } },
         _count: { _all: true },
       }),
+      prisma.report.groupBy({
+        by: ['zoneId'],
+        where: { parentId: null, status: 'RESOLVED', resolvedAt: { gte: monthAgo } },
+        _count: { _all: true },
+      }),
+      prisma.report.groupBy({ by: ['zoneId'], _max: { createdAt: true } }),
     ]);
     const openBy = new Map(openCounts.map((c) => [c.zoneId, c._count._all]));
+    const resolvedBy = new Map(resolvedCounts.map((c) => [c.zoneId, c._count._all]));
+    const lastBy = new Map(lastReports.map((c) => [c.zoneId, c._max.createdAt]));
     return zones.map((z) => ({
       ...z,
       color: indexColor(z.cleanIndex),
       openCount: openBy.get(z.id) ?? 0,
+      resolved30d: resolvedBy.get(z.id) ?? 0,
+      lastReportAt: lastBy.get(z.id) ?? null,
     }));
   });
 

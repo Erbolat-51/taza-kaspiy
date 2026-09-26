@@ -4,6 +4,7 @@ import 'leaflet.markercluster';
 import 'leaflet.heat';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useMapStore } from '../stores/map';
 import {
@@ -20,6 +21,9 @@ const AKTAU: L.LatLngTuple = [43.65, 51.17];
 const store = useMapStore();
 const { visible, zones, layers, fresh, selectedId } = storeToRefs(store);
 const { locale } = useI18n();
+const route = useRoute();
+/** Из рейтинга: /?zone=ID — показать участок целиком, когда полигоны загрузятся. */
+let pendingZone = Number(route.query.zone) || null;
 
 const el = ref<HTMLDivElement | null>(null);
 let map: L.Map;
@@ -150,6 +154,15 @@ function syncZones() {
   }
 }
 
+function focusPendingZone() {
+  if (!pendingZone) return;
+  const poly = zonePolys.get(pendingZone);
+  if (!poly) return;
+  map.fitBounds(poly.getBounds(), { padding: [60, 60], maxZoom: 15 });
+  poly.openTooltip(poly.getBounds().getCenter());
+  pendingZone = null;
+}
+
 function syncZoneVisibility() {
   if (layers.value.zones) zoneLayer.addTo(map);
   else zoneLayer.remove();
@@ -188,11 +201,19 @@ onMounted(() => {
   syncZoneVisibility();
   syncMarkers();
   focusSelected();
+  focusPendingZone();
 });
 
 watch(visible, syncMarkers);
 watch(() => fresh.value.size, syncMarkers);
-watch(zones, syncZones, { deep: true });
+watch(
+  zones,
+  () => {
+    syncZones();
+    focusPendingZone();
+  },
+  { deep: true },
+);
 watch(locale, syncZones);
 watch(() => layers.value.heatmap, syncHeat);
 watch(() => layers.value.zones, syncZoneVisibility);

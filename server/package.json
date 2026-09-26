@@ -16,7 +16,9 @@
     "test": "vitest run",
     "ai:test": "dotenv -e ../.env -- tsx scripts/ai-test.ts",
     "bot:sim": "dotenv -e ../.env -- tsx scripts/bot-sim.ts",
-    "start": "node --env-file=../.env dist/src/index.js"
+    "start": "node --env-file=../.env dist/src/index.js",
+    "demo:seed": "dotenv -e ../.env -- tsx prisma/seed/demo.ts",
+    "demo:reset": "dotenv -e ../.env -- tsx prisma/seed/reset.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

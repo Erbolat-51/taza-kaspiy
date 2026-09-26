@@ -26,7 +26,9 @@
     "build:web": "npm run build -w web",
     "build:server": "npm run build -w server",
     "build": "npm run build -w web && npm run build -w server",
-    "start": "npm run start -w server"
+    "start": "npm run start -w server",
+    "demo:seed": "npm run demo:seed -w server",
+    "demo:reset": "npm run demo:reset -w server --"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
